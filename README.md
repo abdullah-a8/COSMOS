@@ -136,7 +136,7 @@ Defaults can be changed in `config/settings.py`.
 
 The core RAG prompt is in `config/prompts.py`. Adjusting this can significantly alter the chatbot's response style and focus.
 
-## Project Structure (Simplified)
+## Project Structure
 
 ```
 RAG-Chatbot/
