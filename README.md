@@ -80,8 +80,8 @@ The chatbot is built using Python, Streamlit, LangChain, and Pinecone.
 1.  **Clone the Repository**:
     ```bash
     # Use the appropriate URL for your repository
-    git clone https://github.com/yourusername/rag-chatbot.git
-    cd rag-chatbot
+    git clone https://github.com/abdullah-a8/COSMOS.git
+    cd COSMOS
     ```
 
 2.  **Set Up Virtual Environment**: (Recommended)
