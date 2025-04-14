@@ -1,6 +1,6 @@
 # COSMOS - Collaborative Organized System for Multiple Operating Specialists
 
-![COSMOS Banner](./Images/COSMOS.png)
+![COSMOS Banner](./Images/COSMOS_1.png)
 
 ## Project Intuition
 
