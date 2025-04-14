@@ -1,6 +1,6 @@
-# Multi-Model RAG Chatbot
+# COSMOS - Collaborative Organized System for Multiple Operating Specialists
 
-![RAG Chatbot Banner](https://)
+![COSMOS Banner](./Images/COSMOS.png)
 
 ## Project Intuition
 
