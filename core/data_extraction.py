@@ -4,10 +4,47 @@ from time import sleep
 import hashlib
 from youtube_transcript_api import YouTubeTranscriptApi
 
+# Try to import the C++ implementations first, fall back to Python if not available
+try:
+    from core.cpp_modules import hash_generator
+    USE_CPP_HASH = True
+    print("Using C++ hash generator for improved performance")
+except ImportError:
+    USE_CPP_HASH = False
+    print("C++ hash generator not available, using Python implementation")
+
+try:
+    from core.cpp_modules import pdf_extractor
+    USE_CPP_PDF = True
+    print("Using C++ PDF extractor for improved performance")
+except ImportError:
+    USE_CPP_PDF = False
+    print("C++ PDF extractor not available, using Python implementation")
+
 def extract_text_from_pdf(file):
     try:
         file_content = file.read()
-        pdf_hash = hashlib.sha256(file_content).hexdigest()
+        
+        if USE_CPP_PDF:
+            # Use C++ implementation for PDF extraction and hashing
+            try:
+                text, pdf_hash = pdf_extractor.extract_pdf_text_and_hash(file_content)
+                return text, pdf_hash
+            except Exception as e:
+                print(f"C++ PDF extraction failed, falling back to Python: {e}")
+                # Fall back to Python implementation on error
+                file.seek(0)  # Reset file pointer
+                file_content = file.read()
+        
+        # Python implementation
+        if USE_CPP_HASH:
+            # Use C++ implementation just for hashing
+            pdf_hash = hash_generator.compute_sha256_buffer(file_content)
+        else:
+            # Pure Python implementation for hashing
+            pdf_hash = hashlib.sha256(file_content).hexdigest()
+            
+        # Use Python implementation for PDF extraction
         pdf_document = fitz.open("pdf", file_content)
         all_text = ""
         for page_number in range(pdf_document.page_count):

@@ -3,6 +3,15 @@ from urllib.parse import urlparse
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 
+# Try to import the C++ chunker first, fall back to Python if not available
+try:
+    from core.cpp_modules import text_chunker
+    USE_CPP_CHUNKER = True
+    print("Using C++ text chunker for improved performance")
+except ImportError:
+    USE_CPP_CHUNKER = False
+    print("C++ text chunker not available, using Python implementation")
+
 # Function to split content into chunks and add metadata/IDs
 def process_content(content, chunk_size, chunk_overlap, source_id):
     if not source_id:  # Don't process if we don't have a source identifier
@@ -57,10 +66,43 @@ def process_content(content, chunk_size, chunk_overlap, source_id):
 
     base_document = Document(page_content=content, metadata=source_metadata)
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    
-    # Split based on the base document to ensure all chunks inherit the initial metadata
-    split_chunks = text_splitter.split_documents([base_document])
+    # Use the C++ chunker if available, otherwise fall back to Python
+    if USE_CPP_CHUNKER:
+        try:
+            # Ensure content is properly encoded as UTF-8
+            if isinstance(content, bytes):
+                # If content is bytes, try to decode it
+                try:
+                    content_str = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    # If UTF-8 decoding fails, try with a more lenient encoding
+                    content_str = content.decode('latin-1')
+            elif isinstance(content, str):
+                content_str = content
+            else:
+                # Convert other types to string
+                content_str = str(content)
+            
+            # Use C++ implementation for text chunking
+            raw_chunks = text_chunker.split_text_with_word_count(content_str, chunk_size, chunk_overlap)
+            
+            # Create Document objects with metadata
+            split_chunks = []
+            for chunk_text in raw_chunks:
+                doc = Document(
+                    page_content=chunk_text,
+                    metadata=base_document.metadata.copy()
+                )
+                split_chunks.append(doc)
+        except Exception as e:
+            print(f"C++ text chunking failed, falling back to Python: {e}")
+            # Fall back to Python implementation on error
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+            split_chunks = text_splitter.split_documents([base_document])
+    else:
+        # Use the original Python implementation
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        split_chunks = text_splitter.split_documents([base_document])
 
     # Process each chunk: add sequence info and generate final Pinecone IDs
     chunk_ids = []

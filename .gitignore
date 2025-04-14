@@ -2,9 +2,12 @@
 __pycache__/
 *.py[cod]
 *$py.class
+# Include specific .so files needed for the package
 *.so
+!core/cpp_modules/*.so
 .Python
 build/
+cpp_extensions/build/
 develop-eggs/
 dist/
 downloads/
@@ -21,6 +24,15 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# C++ build artifacts
+*.o
+*.a
+*.out
+*.dll
+*.dylib
+*.exe
+compile_commands.json
 
 # PyInstaller
 *.manifest
