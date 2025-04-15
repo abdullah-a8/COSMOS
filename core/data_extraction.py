@@ -39,7 +39,7 @@ def extract_text_from_pdf(file):
         # Python implementation
         if USE_CPP_HASH:
             # Use C++ implementation just for hashing
-            pdf_hash = hash_generator.compute_sha256_buffer(file_content)
+            pdf_hash = hash_generator.compute_sha256(file_content)
         else:
             # Pure Python implementation for hashing
             pdf_hash = hashlib.sha256(file_content).hexdigest()

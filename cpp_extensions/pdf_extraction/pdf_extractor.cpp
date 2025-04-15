@@ -9,7 +9,7 @@
 #include <poppler/cpp/poppler-document.h>
 #include <poppler/cpp/poppler-page.h>
 #include <poppler/cpp/poppler-global.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 namespace py = pybind11;
 using namespace std;
@@ -22,14 +22,17 @@ using namespace std;
  * @return Hexadecimal string representation of the hash
  */
 string sha256_hash(const unsigned char* data, size_t size) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, data, size);
-    SHA256_Final(hash, &sha256);
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    
+    EVP_MD_CTX* context = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(context, EVP_sha256(), NULL);
+    EVP_DigestUpdate(context, data, size);
+    EVP_DigestFinal_ex(context, hash, &hash_len);
+    EVP_MD_CTX_free(context);
     
     stringstream ss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+    for (int i = 0; i < hash_len; i++) {
         ss << hex << setw(2) << setfill('0') << static_cast<int>(hash[i]);
     }
     

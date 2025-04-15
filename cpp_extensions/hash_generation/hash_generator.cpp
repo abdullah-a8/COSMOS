@@ -1,6 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 #include <string>
 #include <vector>
 #include <sstream>
@@ -17,14 +17,26 @@ using namespace std;
  * @return Hexadecimal string representation of the hash
  */
 string sha256_hash(const unsigned char* data, size_t size) {
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, data, size);
-    SHA256_Final(hash, &sha256);
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    
+    // Create and initialize the context
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    
+    // Initialize digest engine
+    EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+    
+    // Provide the message to be hashed
+    EVP_DigestUpdate(ctx, data, size);
+    
+    // Finalize the hash
+    EVP_DigestFinal_ex(ctx, hash, &hash_len);
+    
+    // Clean up
+    EVP_MD_CTX_free(ctx);
     
     stringstream ss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+    for (unsigned int i = 0; i < hash_len; i++) {
         ss << hex << setw(2) << setfill('0') << static_cast<int>(hash[i]);
     }
     
