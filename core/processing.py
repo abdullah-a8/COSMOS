@@ -69,29 +69,18 @@ def process_content(content, chunk_size, chunk_overlap, source_id):
     # Use the C++ chunker if available, otherwise fall back to Python
     if USE_CPP_CHUNKER:
         try:
-            # Ensure content is properly encoded as UTF-8
-            if isinstance(content, bytes):
-                # If content is bytes, try to decode it
-                try:
-                    content_str = content.decode('utf-8')
-                except UnicodeDecodeError:
-                    # If UTF-8 decoding fails, try with a more lenient encoding
-                    content_str = content.decode('latin-1')
-            elif isinstance(content, str):
-                content_str = content
-            else:
-                # Convert other types to string
-                content_str = str(content)
-            
+            # Ensure content is treated as a string.
+            content_str = str(content)
+
             # Use C++ implementation for text chunking
             raw_chunks = text_chunker.split_text_with_word_count(content_str, chunk_size, chunk_overlap)
-            
+
             # Create Document objects with metadata
             split_chunks = []
             for chunk_text in raw_chunks:
                 doc = Document(
                     page_content=chunk_text,
-                    metadata=base_document.metadata.copy()
+                    metadata=base_document.metadata.copy() # Use metadata from base_document
                 )
                 split_chunks.append(doc)
         except Exception as e:
