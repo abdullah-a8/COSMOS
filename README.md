@@ -259,17 +259,6 @@ COSMOS/
 └── README.md               # This documentation file
 ```
 
-## Development and Contribution
-
-Contributions are welcome! If you'd like to improve COSMOS or add new features:
-
-1.  **Fork the repository** on GitHub.
-2.  **Create a feature branch**: `git checkout -b feature/YourFeatureName`
-3.  **Make your changes**: Implement your feature or bug fix.
-4.  **Commit your changes**: `git commit -m 'Add some amazing feature'`
-5.  **Push to the branch**: `git push origin feature/YourFeatureName`
-6.  **Submit a pull request**: Open a pull request from your feature branch to the main repository.
-
 ### Development Guidelines
 
 -   **Code Style**: Please follow PEP 8 guidelines for Python code.
