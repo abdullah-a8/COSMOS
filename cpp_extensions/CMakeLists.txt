@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.30.0)
 project(cosmos_cpp_extensions)
 
 set(CMAKE_CXX_STANDARD 17)
