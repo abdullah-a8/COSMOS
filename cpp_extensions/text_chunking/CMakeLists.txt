@@ -1,3 +1,5 @@
+cmake_policy(SET CMP0177 NEW)
+
 pybind11_add_module(text_chunker text_chunker.cpp)
 
 # Make pybind11 headers available

@@ -1,9 +1,17 @@
+cmake_policy(SET CMP0177 NEW)
+
 find_package(OpenSSL REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER REQUIRED poppler-cpp)
 
 # Create the pybind11 module
 pybind11_add_module(pdf_extractor pdf_extractor.cpp)
+
+# Configure RPATH settings for portability
+set_target_properties(pdf_extractor PROPERTIES 
+    INSTALL_RPATH "$ORIGIN:$ORIGIN/../../../lib:$ORIGIN/../../../lib64"
+    BUILD_WITH_INSTALL_RPATH TRUE
+)
 
 # Link against libraries
 target_link_libraries(pdf_extractor PRIVATE 

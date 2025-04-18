@@ -1,3 +1,5 @@
+cmake_policy(SET CMP0177 NEW)
+
 find_package(OpenSSL REQUIRED)
 
 # Create the pybind11 module
