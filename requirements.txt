@@ -158,7 +158,6 @@ pytz==2025.2
 pyudev==0.24.3
 pyxdg==0.27
 PyYAML==6.0.2
-pyynl @ file:///builddir/build/BUILD/kernel-6.14.2-build/kernel-6.14.2/linux-6.14.2-300.fc42.x86_64/tools/net/ynl
 referencing==0.36.2
 regex==2024.11.6
 reportlab==4.3.1
@@ -171,8 +170,6 @@ respx==0.22.0
 rpds-py==0.24.0
 rpm==4.20.1
 rsa==4.9
-selinux @ file:///builddir/build/BUILD/libselinux-3.8-build/libselinux-3.8/src
-sepolicy @ file:///builddir/build/BUILD/policycoreutils-3.8-build/selinux-3.8/python/sepolicy
 setools==4.5.1
 setuptools==78.1.0
 sgmllib3k==1.0.0
