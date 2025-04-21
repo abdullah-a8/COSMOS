@@ -2,12 +2,14 @@ import streamlit as st
 from core.data_extraction import extract_text_from_pdf, extract_text_from_url
 from core.processing import process_content
 from core.vector_store import get_pinecone_vector_store, add_chunks_to_vector_store
-from core.chain import get_chain, ask_question
+from core.chain import get_chain, ask_question, get_fast_chain
 import config.settings as settings
 
 from streamlit import cache_data, cache_resource
 import time
 import datetime
+import concurrent.futures
+import re
 
 # Streamlit App Configuration
 st.set_page_config(page_title="Multi-Model RAG Chatbot 📄🔍", page_icon="🧬", layout="wide")
@@ -192,6 +194,27 @@ if "rag_current_source_id" not in st.session_state:
 if "rag_last_processed_source_id" not in st.session_state:
     st.session_state["rag_last_processed_source_id"] = None
 
+# Initialize vector store once at page load or after reset
+if "rag_vector_store" not in st.session_state or st.session_state.get("rag_vector_store") is None:
+    try:
+        with st.spinner("Connecting to knowledge base..."):
+            # Direct initialization to avoid dependency on the cached function
+            vector_store = get_pinecone_vector_store()
+            if vector_store:
+                st.session_state["rag_vector_store"] = vector_store
+                st.session_state["rag_vector_store_initialized"] = True
+                print("Pinecone connection initialized at page load.")
+            else:
+                st.session_state["rag_vector_store"] = None
+                st.session_state["rag_vector_store_initialized"] = False
+                print("Failed to initialize Pinecone connection at page load.")
+                st.sidebar.warning("⚠️ Could not connect to the knowledge base. Some features may be limited.")
+    except Exception as e:
+        st.session_state["rag_vector_store"] = None
+        st.session_state["rag_vector_store_initialized"] = False
+        print(f"Error initializing Pinecone connection: {e}")
+        st.sidebar.error(f"⚠️ Error connecting to knowledge base: {str(e)}")
+
 # Reset App Function
 def reset_app():
     """Set a reset flag to True and trigger app re-run."""
@@ -211,6 +234,9 @@ if st.session_state.get("reset", False):
     st.cache_data.clear()
     st.cache_resource.clear()
     st.session_state["reset"] = False
+    # Explicitly flag that we need to reinitialize the vector store
+    st.session_state["rag_vector_store_initialized"] = False
+    st.session_state["rag_vector_store"] = None
     st.rerun()
 
 # Content Upload Section
@@ -254,6 +280,20 @@ def cached_get_pinecone_vector_store():
         print("Failed to initialize Pinecone connection (cached).")
         st.session_state["rag_vector_store_initialized"] = False
     return vs
+
+def preprocess_query(query):
+    """Extract key terms and concepts to make retrieval more efficient"""
+    # Remove common stop words and keep meaningful terms
+    stop_words = r'\b(the|a|an|in|on|at|to|for|with|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|shall|should|may|might|must|can|could)\b'
+    cleaned_query = re.sub(stop_words, '', query.lower())
+    # Remove extra spaces
+    cleaned_query = re.sub(r'\s+', ' ', cleaned_query).strip()
+    
+    # If cleaning made the query too short, return original
+    if len(cleaned_query.split()) < 3:
+        return query
+        
+    return cleaned_query
 
 # Process uploaded inputs
 if input_method == "PDF File":
@@ -308,8 +348,8 @@ if should_process:
                 
                 update_timer()
 
-                # Get vector store connection
-                vector_store = cached_get_pinecone_vector_store()
+                # Get vector store from session state
+                vector_store = st.session_state.get("rag_vector_store")
                 
                 if vector_store:
                     # Add chunks to the vector store
@@ -411,8 +451,8 @@ if prompt := st.chat_input("Ask a question about the content in the knowledge ba
     with st.chat_message("user"):
         st.write(prompt)
 
-    # Get the Pinecone vector store with filter for source types
-    vector_store = cached_get_pinecone_vector_store()
+    # Get the Pinecone vector store from session state
+    vector_store = st.session_state.get("rag_vector_store")
     retriever = None
     
     if vector_store:
@@ -420,7 +460,7 @@ if prompt := st.chat_input("Ask a question about the content in the knowledge ba
         retriever = vector_store.as_retriever(
             search_kwargs={
                 "filter": {"source_type": {"$in": source_filters}},
-                "k": 5  # Retrieve top 5 chunks
+                "k": 3  # Reduced from 5 to 3 for faster retrieval
             }
         )
         
@@ -431,8 +471,16 @@ if prompt := st.chat_input("Ask a question about the content in the knowledge ba
         st.error("Failed to establish connection with Pinecone Vector Store. Cannot proceed.", icon="🚨")
         st.stop()
 
-    # Get relevant documents
-    context_docs = retriever.invoke(prompt) if retriever else []
+    # Get relevant documents 
+    # Process the query for better retrieval
+    processed_query = preprocess_query(prompt)
+    print(f"Original query: '{prompt}'")
+    print(f"Processed query: '{processed_query}'")
+    
+    # Get relevant documents without caching
+    start_time = time.time()
+    context_docs = retriever.invoke(processed_query) if retriever else []
+    print(f"Context retrieval took {time.time() - start_time:.2f} seconds")
     
     # Format context with source information for better citation
     if context_docs:
@@ -475,17 +523,89 @@ if prompt := st.chat_input("Ask a question about the content in the knowledge ba
     assistant_response_display = ""
 
     with st.chat_message("assistant"):
+        # Create placeholders for each model response
         model_placeholders = {}
         for model in selected_models:
             model_placeholders[model] = st.empty()
-            model_placeholders[model].markdown(f"*Thinking with {model}...*")
-
+        
+        initial_placeholder = st.empty()
+        
+        # Only use the fast model if we have multiple models (otherwise it's wasted work)
+        if len(selected_models) > 1:
+            # First generate a quick response with a fast model
+            fast_chain = get_fast_chain(temperature)
+            if fast_chain:
+                try:
+                    # Start with a thinking message
+                    initial_placeholder.markdown("*Generating response...*")
+                    
+                    # Generate quick response with truncated context
+                    # Use a subset of the context for faster response
+                    truncated_context = context[:min(len(context), 4000)]  # Limit context size for faster response
+                    response = ask_question(fast_chain, prompt, truncated_context)[0]
+                    
+                    # Show the quick response (but don't add it to the final message)
+                    initial_placeholder.markdown(f"{response}")
+                except Exception as e:
+                    print(f"Error generating fast response: {e}")
+                    initial_placeholder.markdown("*Generating detailed response...*")
+        else:
+            # For single model, just show a thinking message
+            initial_placeholder.markdown("*Generating response...*")
+        
+        # Generate full responses with selected models in parallel
         for model in selected_models:
-            chain = get_chain(model, temperature)
-            response, updated_history = ask_question(chain, prompt, context, st.session_state["rag_conversation_history"])
-            responses[model] = response
-            model_placeholders[model].markdown(f"**Response from {model}:**\n{response}")
-            assistant_response_display += f"**{model}**: {response}\n\n"
+            model_placeholders[model] = st.empty()
+            model_placeholders[model].markdown(f"*Processing with {model}...*")
+            
+        # Define a function to process each model concurrently
+        def process_model(model_name, question, context, conversation_history):
+            try:
+                chain = get_chain(model_name, temperature)
+                if not chain:
+                    return model_name, f"Error: Could not initialize model {model_name}", []
+                response, updated_history = ask_question(chain, question, context, conversation_history)
+                return model_name, response, updated_history
+            except Exception as e:
+                print(f"Error processing model {model_name}: {e}")
+                return model_name, f"Error: {str(e)}", []
+        
+        # Process models concurrently
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            # Get current conversation history to pass to each process_model call
+            current_history = st.session_state.get("rag_conversation_history", "")
+            
+            # Pass conversation_history to each process_model call
+            future_to_model = {
+                executor.submit(process_model, model, prompt, context, current_history): model 
+                for model in selected_models
+            }
+            
+            latest_history = current_history
+            for future in concurrent.futures.as_completed(future_to_model):
+                model = future_to_model[future]
+                try:
+                    model_name, response, updated_history = future.result()
+                    responses[model] = response
+                    
+                    # If only one model is selected, replace the initial "Generating" message
+                    # Otherwise show all model responses labeled
+                    if len(selected_models) == 1:
+                        # For single model, directly update the initial placeholder
+                        initial_placeholder.markdown(f"{response}")
+                        # Clear the "Processing" message
+                        model_placeholders[model].empty()
+                        assistant_response_display = response
+                    else:
+                        model_placeholders[model].markdown(f"**Response from {model}:**\n{response}")
+                        assistant_response_display += f"**{model}**: {response}\n\n"
+                    
+                    # Save the most recent history update
+                    latest_history = updated_history
+                except Exception as e:
+                    print(f"Exception processing result from {model}: {e}")
+                    model_placeholders[model].markdown(f"**Response from {model}:**\nError generating response.")
+                    assistant_response_display += f"**{model}**: Error generating response.\n\n"
 
     st.session_state["rag_messages"].append({"role": "assistant", "content": assistant_response_display.strip()})
-    st.session_state["rag_conversation_history"] = updated_history
+    st.session_state["rag_conversation_history"] = latest_history

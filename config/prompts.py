@@ -19,6 +19,13 @@ Context:
 Question: {question}
 """
 
+# Fast RAG prompt - more concise for quicker generation
+RAG_FAST_PROMPT = """Answer the question concisely using only this context:
+{context}
+
+Question: {question}
+Answer:"""
+
 # --- Gmail Agent Prompts ---
 
 GMAIL_CLASSIFY_PROMPT = """

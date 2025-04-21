@@ -1,6 +1,8 @@
 from langchain_openai import OpenAIEmbeddings
 from langchain_pinecone import Pinecone
 import os
+import time
+from functools import lru_cache
 
 def add_chunks_to_vector_store(vector_store, chunks, chunk_ids):
     if not chunks or not chunk_ids:
@@ -20,6 +22,29 @@ def add_chunks_to_vector_store(vector_store, chunks, chunk_ids):
         print(f"Error adding documents to Pinecone: {e}")
         return False
 
+# Create a cached version of the embeddings creation to avoid redundant API calls
+class CachedEmbeddings:
+    """Wrapper around OpenAIEmbeddings that caches embedding results to avoid redundant API calls"""
+    
+    def __init__(self, model="text-embedding-3-large", cache_size=100):
+        self.embeddings = OpenAIEmbeddings(model=model)
+        self.cache_size = cache_size
+        self._setup_cache()
+    
+    def _setup_cache(self):
+        # Setup LRU cache for the embed_query method
+        self.embed_query = lru_cache(maxsize=self.cache_size)(self.embed_query)
+    
+    def embed_query(self, text):
+        """Generate embeddings for a single query text (cached)"""
+        print(f"Generating embedding for query: '{text[:30]}...'")
+        # Hash the text to create a unique cache key
+        return self.embeddings.embed_query(text)
+    
+    def embed_documents(self, documents):
+        """Generate embeddings for a list of documents (not cached)"""
+        return self.embeddings.embed_documents(documents)
+
 def get_pinecone_vector_store():
     index_name = os.getenv("PINECONE_INDEX_NAME")
     pinecone_api_key = os.getenv("PINECONE_API_KEY")
@@ -36,8 +61,8 @@ def get_pinecone_vector_store():
          return None
 
     try:
-        # Initialize OpenAI Embeddings - 3072 for text-embedding-3-large
-        embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+        # Initialize cached OpenAI Embeddings - 3072 for text-embedding-3-large
+        embeddings = CachedEmbeddings(model="text-embedding-3-large")
         
         print(f"Initializing Pinecone connection for index: {index_name}")
         # Connect to existing index for retrieval/adding

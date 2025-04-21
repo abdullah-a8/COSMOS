@@ -31,6 +31,33 @@ def get_chain(model_name=None, temperature=None):
     chain = prompt_template | lama | parser
     return chain
 
+def get_fast_chain(temperature=None):
+    """
+    Creates a RAG chain with a smaller, faster model for quick initial responses.
+    """
+    effective_temperature = temperature if temperature is not None else settings.DEFAULT_TEMPERATURE
+    
+    if not settings.GROQ_API_KEY:
+        print("Error: GROQ_API_KEY not found in settings.")
+        return None
+        
+    try:
+        # Use a smaller model for faster initial responses
+        fast_model = ChatGroq(
+            temperature=effective_temperature,
+            groq_api_key=settings.GROQ_API_KEY,
+            model_name="llama-3.1-8b-instant",  # Smaller, faster model
+        )
+    except Exception as e:
+        print(f"Error initializing fast ChatGroq: {e}")
+        return None
+
+    parser = StrOutputParser()
+    # Use a more concise prompt for the fast model
+    prompt_template = ChatPromptTemplate.from_template(prompts.RAG_FAST_PROMPT)
+    chain = prompt_template | fast_model | parser
+    return chain
+
 def ask_question(chain, question, context, conversation_history: list = None):
     """
     Generate a response using the provided chain, context, and history.

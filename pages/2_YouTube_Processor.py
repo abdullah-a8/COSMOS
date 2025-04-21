@@ -56,9 +56,30 @@ chunk_overlap = st.sidebar.slider(
 if "youtube_last_processed_id" not in st.session_state:
     st.session_state["youtube_last_processed_id"] = None
 
+# Initialize vector store once at page load or after reset
+if "youtube_vector_store" not in st.session_state or st.session_state.get("youtube_vector_store") is None:
+    try:
+        with st.spinner("Connecting to knowledge base..."):
+            # Direct initialization 
+            vector_store = get_pinecone_vector_store()
+            if vector_store:
+                st.session_state["youtube_vector_store"] = vector_store
+                st.session_state["youtube_vector_store_initialized"] = True
+                print("Pinecone connection initialized for YouTube processor at page load.")
+            else:
+                st.session_state["youtube_vector_store"] = None
+                st.session_state["youtube_vector_store_initialized"] = False
+                print("Failed to initialize Pinecone connection for YouTube processor.")
+    except Exception as e:
+        st.session_state["youtube_vector_store"] = None
+        st.session_state["youtube_vector_store_initialized"] = False
+        print(f"Error initializing Pinecone connection for YouTube processor: {e}")
+
 # Reset button
 def reset_youtube_processor():
     st.session_state["youtube_last_processed_id"] = None
+    st.session_state["youtube_vector_store"] = None
+    st.session_state["youtube_vector_store_initialized"] = False
     st.rerun()
 
 st.sidebar.button("Reset YouTube Processor", on_click=reset_youtube_processor)
@@ -111,6 +132,11 @@ if youtube_url:
         )
     # Process button (only show if not already processed in this session)
     elif st.button("Process YouTube Transcript"):
+        # Check if vector store is initialized before proceeding
+        if not st.session_state.get("youtube_vector_store"):
+            st.error("Knowledge base connection not available. Try refreshing the page or check your API keys.")
+            st.stop()
+            
         # Create columns for status and timer
         status_col, timer_col = st.columns([3, 1])
         
@@ -164,7 +190,8 @@ if youtube_url:
                     
                     update_timer()
                     
-                    vector_store = get_pinecone_vector_store()
+                    # Get vector store from session state instead of creating a new connection
+                    vector_store = st.session_state.get("youtube_vector_store")
                     
                     if vector_store:
                         st.write("Adding chunks to knowledge base...")
