@@ -28,3 +28,5 @@ requests==2.32.3
 tqdm==4.67.1
 typing_extensions==4.12.2
 urllib3==2.3.0
+streamlit-authenticator==0.4.2
+bcrypt==4.3.0

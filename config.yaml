@@ -1,0 +1,12 @@
+credentials:
+  usernames:
+    ${APP_USERNAME}:
+      email: ${EMAIL}
+      name: ${NAME}
+      password: ${PASSWORD_HASH}
+cookie:
+  expiry_days: ${COOKIE_EXPIRY_DAYS:-30}
+  name: ${COOKIE_NAME:-cosmos_auth}
+  key: ${COOKIE_KEY}
+  secure: ${COOKIE_SECURE:-true}
+  samesite: ${COOKIE_SAMESITE:-Lax} 

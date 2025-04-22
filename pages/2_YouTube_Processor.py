@@ -8,6 +8,12 @@ import config.settings as settings
 
 from streamlit import cache_data, cache_resource
 
+# --- Authentication Check --- 
+# Ensure the user is logged in, otherwise stop execution
+if not st.session_state.get('authentication_status'):
+    st.warning("Please log in to access this page.")
+    st.stop() # Stop execution if not authenticated
+
 # Streamlit App Configuration
 st.set_page_config(page_title="YouTube RAG Processor 🎥", page_icon="▶️", layout="wide")
 st.title("YouTube Transcript to Knowledge Base Processor 🎥")

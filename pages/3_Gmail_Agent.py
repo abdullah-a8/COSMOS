@@ -1,5 +1,20 @@
 import streamlit as st
+import sys
 import os
+
+# Add project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    # Insert at the beginning of the path list
+    sys.path.insert(0, project_root)
+
+# --- Authentication Check --- 
+# Ensure the user is logged in, otherwise stop execution
+if not st.session_state.get('authentication_status'):
+    st.warning("Please log in to access this page.")
+    st.stop() # Stop execution if not authenticated
+
+# --- Original Page Code Starts Here --- 
 import time
 import base64
 import json
@@ -221,3 +236,16 @@ elif 'emails' in st.session_state and not st.session_state['emails']:
 # Footer
 st.divider()
 st.caption("Gmail Response Assistant • Powered by OpenAI GPT • Built with Streamlit")
+
+# Example: Ensure main logic runs only if authenticated (redundant due to st.stop(), but good practice)
+if st.session_state.get('authentication_status'):
+    # --- Your main page logic for Gmail Agent ---
+    # Initialize session state variables (only if needed specifically for this page)
+    # ...
+    
+    st.title("📧 Gmail Agent: Smart Email Management")
+    # ... (the rest of your Gmail agent page code) ...
+    pass # Placeholder for the rest of the page code
+else:
+    # This part should technically not be reached due to st.stop()
+    st.warning("Authentication required.")
