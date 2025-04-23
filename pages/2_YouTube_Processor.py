@@ -62,11 +62,11 @@ chunk_overlap = st.sidebar.slider(
 if "youtube_last_processed_id" not in st.session_state:
     st.session_state["youtube_last_processed_id"] = None
 
-# Initialize vector store once at page load or after reset
-if "youtube_vector_store" not in st.session_state or st.session_state.get("youtube_vector_store") is None:
+# Initialize vector store only once at page load or after reset
+if "youtube_vector_store" not in st.session_state or st.session_state["youtube_vector_store"] is None:
     try:
         with st.spinner("Connecting to knowledge base..."):
-            # Direct initialization 
+            # Get vector store connection
             vector_store = get_pinecone_vector_store()
             if vector_store:
                 st.session_state["youtube_vector_store"] = vector_store
@@ -86,6 +86,11 @@ def reset_youtube_processor():
     st.session_state["youtube_last_processed_id"] = None
     st.session_state["youtube_vector_store"] = None
     st.session_state["youtube_vector_store_initialized"] = False
+    st.session_state["youtube_processor_needs_reset"] = True
+
+# Check if we need to reset the page (this happens outside the callback)
+if st.session_state.get("youtube_processor_needs_reset", False):
+    st.session_state["youtube_processor_needs_reset"] = False
     st.rerun()
 
 st.sidebar.button("Reset YouTube Processor", on_click=reset_youtube_processor)
@@ -139,7 +144,7 @@ if youtube_url:
     # Process button (only show if not already processed in this session)
     elif st.button("Process YouTube Transcript"):
         # Check if vector store is initialized before proceeding
-        if not st.session_state.get("youtube_vector_store"):
+        if not st.session_state.get("youtube_vector_store_initialized", False) or st.session_state.get("youtube_vector_store") is None:
             st.error("Knowledge base connection not available. Try refreshing the page or check your API keys.")
             st.stop()
             
@@ -192,11 +197,8 @@ if youtube_url:
                 
                 if chunks:
                     st.write(f"Created {len(chunks)} chunks with YouTube-specific IDs")
-                    st.write("Connecting to knowledge base...")
                     
-                    update_timer()
-                    
-                    # Get vector store from session state instead of creating a new connection
+                    # Reuse the existing vector store from session state - don't reconnect
                     vector_store = st.session_state.get("youtube_vector_store")
                     
                     if vector_store:
@@ -226,7 +228,7 @@ if youtube_url:
                             </div>
                             """, unsafe_allow_html=True)
                     else:
-                        st.error("Failed to connect to knowledge base.")
+                        st.error("Knowledge base connection not available.")
                         # Show failure in timer
                         elapsed = time.time() - start_time
                         timer_placeholder.markdown(f"""
