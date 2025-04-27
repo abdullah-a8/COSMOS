@@ -236,16 +236,3 @@ elif 'emails' in st.session_state and not st.session_state['emails']:
 # Footer
 st.divider()
 st.caption("Gmail Response Assistant • Powered by OpenAI GPT • Built with Streamlit")
-
-# Example: Ensure main logic runs only if authenticated (redundant due to st.stop(), but good practice)
-if st.session_state.get('authentication_status'):
-    # --- Your main page logic for Gmail Agent ---
-    # Initialize session state variables (only if needed specifically for this page)
-    # ...
-    
-    st.title("📧 Gmail Agent: Smart Email Management")
-    # ... (the rest of your Gmail agent page code) ...
-    pass # Placeholder for the rest of the page code
-else:
-    # This part should technically not be reached due to st.stop()
-    st.warning("Authentication required.")
