@@ -152,6 +152,24 @@ if 'emails' in st.session_state and st.session_state['emails']:
             st.session_state['selected_email_id'] = selected_id_candidate
             st.session_state['generated_reply'] = ""
             st.session_state['email_summary'] = ""
+            
+            # Auto-generate summary for the newly selected email
+            if service:
+                try:
+                    # Get user email information for personalization
+                    user_info = service.users().getProfile(userId='me').execute()
+                    recipient_info = {
+                        'name': user_info.get('emailAddress', '').split('@')[0],
+                        'email': user_info.get('emailAddress', '')
+                    }
+                except:
+                    recipient_info = None
+                
+                selected_email = next((email for email in emails if email['id'] == selected_id_candidate), None)
+                if selected_email:
+                    with st.spinner("Generating summary..."):
+                        summary = summarize_email(selected_email['body'], recipient_info)
+                        st.session_state['email_summary'] = summary
 
     # Email details and actions
     selected_id = st.session_state.get('selected_email_id')
@@ -165,6 +183,13 @@ if 'emails' in st.session_state and st.session_state['emails']:
             with st.expander("View Full Email Body", expanded=False):
                 st.text(selected_email['body'])
                 
+            # Email summary display
+            with st.expander("View Email Summary", expanded=False):
+                if st.session_state.get('email_summary'):
+                    st.markdown(st.session_state['email_summary'])
+                else:
+                    st.info("Summary not available. Please try regenerating the summary.")
+                
             # Email analysis actions
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -174,7 +199,7 @@ if 'emails' in st.session_state and st.session_state['emails']:
                     st.info(f"Email classified as: **{category}**")
             
             with col2:
-                 if st.button("Summarize Email"):
+                 if st.button("Regenerate Summary"):
                     with st.spinner("Generating summary..."):
                         # Get user's email from Gmail service
                         try:
@@ -189,11 +214,6 @@ if 'emails' in st.session_state and st.session_state['emails']:
                         summary = summarize_email(selected_email['body'], recipient_info)
                     st.session_state['email_summary'] = summary
 
-            # Display summary if available
-            if st.session_state.get('email_summary'):
-                st.subheader("Email Summary")
-                st.markdown(st.session_state['email_summary'])
-                
             st.divider()
             st.subheader("Generate Reply")
             
