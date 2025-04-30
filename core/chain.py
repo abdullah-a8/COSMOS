@@ -17,10 +17,13 @@ def get_chain(model_name=None, temperature=None):
         return None
         
     try:
-        lama = ChatGroq(
+        model = ChatGroq(
             temperature=effective_temperature,
             groq_api_key=settings.GROQ_API_KEY,
             model_name=effective_model_name,
+            max_tokens=None,  # Let model decide appropriate response length
+            timeout=None,     # No timeout limit
+            max_retries=2,    # Retry failed requests twice
         )
     except Exception as e:
         print(f"Error initializing ChatGroq: {e}")
@@ -28,7 +31,7 @@ def get_chain(model_name=None, temperature=None):
 
     parser = StrOutputParser()
     prompt_template = ChatPromptTemplate.from_template(prompts.RAG_SYSTEM_PROMPT)
-    chain = prompt_template | lama | parser
+    chain = prompt_template | model | parser
     return chain
 
 def get_fast_chain(temperature=None):
@@ -42,11 +45,14 @@ def get_fast_chain(temperature=None):
         return None
         
     try:
-        # Use a smaller model for faster initial responses
+        # Use the fastest model for initial responses
         fast_model = ChatGroq(
             temperature=effective_temperature,
             groq_api_key=settings.GROQ_API_KEY,
-            model_name="llama-3.1-8b-instant",  # Smaller, faster model
+            model_name="llama-3.1-8b-instant",  # Latest fast model
+            max_tokens=150,   # Limit tokens for faster preview
+            timeout=None,
+            max_retries=1,    # Single retry for fast response
         )
     except Exception as e:
         print(f"Error initializing fast ChatGroq: {e}")

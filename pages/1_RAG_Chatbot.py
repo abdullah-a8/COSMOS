@@ -26,82 +26,73 @@ st.sidebar.title("Settings")
 
 # Model selection options with performance characteristics
 models = {
-    # DeepSeek Models
-    "deepseek-r1-distill-llama-70b": {
-        "requests_per_minute": 30,
-        "requests_per_day": 1_000,
-        "tokens_per_minute": 6_000,
-        "tokens_per_day": None,  # Unlimited token capacity
-        "advantages": "Highly optimized for low latency with no token limits, making it ideal for large-scale deployments.",
-        "disadvantages": "Limited daily requests compared to other models.",
-    },
-    # Alibaba Cloud Qwen Models
-    "qwen-2.5-32b": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14_400,
-        "tokens_per_minute": 10_000,
-        "tokens_per_day": 500_000,
-        "advantages": "Powerful 32B model optimized for long-context comprehension and reasoning.",
-        "disadvantages": "Requires more computational resources.",
-    },
-    # Google's Gemma Model
-    "gemma2-9b-it": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14_400,
-        "tokens_per_minute": 15_000,
-        "tokens_per_day": 500_000,
-        "advantages": "Higher token throughput, suitable for large-scale, fast inference.",
-        "disadvantages": "Limited versatility compared to larger LLaMA3 models.",
-    },
-    # Meta's LLaMA 3 Models
-    "llama-3.1-8b-instant": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14_400,
-        "tokens_per_minute": 20_000,
-        "tokens_per_day": 500_000,
-        "advantages": "High-speed processing with large token capacity, great for real-time applications.",
-        "disadvantages": "Less accurate for complex reasoning tasks compared to larger models.",
-    },
+    # Meta's Latest Models
     "llama-3.3-70b-versatile": {
         "requests_per_minute": 30,
         "requests_per_day": 1_000,
         "tokens_per_minute": 6_000,
         "tokens_per_day": 100_000,
-        "advantages": "Versatile model optimized for high accuracy in diverse scenarios.",
-        "disadvantages": "Lower throughput compared to some smaller models.",
+        "advantages": "Latest versatile model with 128K context window and superior reasoning capabilities.",
+        "disadvantages": "Limited daily requests compared to smaller models.",
     },
+    "meta-llama/llama-4-maverick-17b-128e-instruct": {
+        "requests_per_minute": 30,
+        "requests_per_day": 7_000,
+        "tokens_per_minute": 15_000,
+        "tokens_per_day": 500_000,
+        "advantages": "Latest Llama 4 model with superior reasoning despite smaller parameter count.",
+        "disadvantages": "New model with potentially varying performance across different query types.",
+    },
+    "llama-3.1-8b-instant": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14_400,
+        "tokens_per_minute": 20_000,
+        "tokens_per_day": 500_000,
+        "advantages": "High-speed processing with 128K context, great for real-time applications.",
+        "disadvantages": "Less accurate for complex reasoning tasks compared to larger models.",
+    },
+    # Specialized Models
+    "deepseek-r1-distill-llama-70b": {
+        "requests_per_minute": 30,
+        "requests_per_day": 1_000,
+        "tokens_per_minute": 6_000,
+        "tokens_per_day": None,  # Unlimited token capacity
+        "advantages": "Specialized for mathematical and logical reasoning tasks with 128K context.",
+        "disadvantages": "Limited daily requests compared to other models.",
+    },
+    "compound-beta": {
+        "requests_per_minute": 30,
+        "requests_per_day": 1_000,
+        "tokens_per_minute": 10_000,
+        "tokens_per_day": 250_000,
+        "advantages": "Groq's agentic system optimized for complex reasoning and tool use.",
+        "disadvantages": "Beta status with potential variability in performance.",
+    },
+    # Additional Models
+    "gemma2-9b-it": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14_400,
+        "tokens_per_minute": 15_000,
+        "tokens_per_day": 500_000,
+        "advantages": "Google's efficient model with strong instruction-following capabilities.",
+        "disadvantages": "Limited versatility compared to larger models.",
+    },
+    "qwen-qwq-32b": {
+        "requests_per_minute": 30,
+        "requests_per_day": 14_400,
+        "tokens_per_minute": 10_000,
+        "tokens_per_day": 500_000,
+        "advantages": "Strong multilingual capabilities and good knowledge representation.",
+        "disadvantages": "May require more system resources than smaller models.",
+    },
+    # Previous Generation (Maintained for compatibility)
     "llama3-70b-8192": {
         "requests_per_minute": 30,
         "requests_per_day": 14_400,
         "tokens_per_minute": 6_000,
         "tokens_per_day": 500_000,
-        "advantages": "Long-context capabilities, ideal for handling detailed research papers and articles.",
-        "disadvantages": "Moderate speed and accuracy for shorter tasks.",
-    },
-    "llama3-8b-8192": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14_400,
-        "tokens_per_minute": 20_000,
-        "tokens_per_day": 500_000,
-        "advantages": "Supports high-speed inference with long-context support.",
-        "disadvantages": "Slightly less accurate for complex reasoning compared to larger models.",
-    },
-    # Mistral AI
-    "mistral-saba-24b": {
-        "requests_per_minute": 30,
-        "requests_per_day": 7_000,
-        "tokens_per_minute": 7_000,
-        "tokens_per_day": 250_000,
-        "advantages": "Strong multi-turn conversation capabilities and effective retrieval augmentation.",
-        "disadvantages": "Limited token capacity compared to LLaMA-70B.",
-    },
-    "mixtral-8x7b-32768": {
-        "requests_per_minute": 30,
-        "requests_per_day": 14_400,
-        "tokens_per_minute": 5_000,
-        "tokens_per_day": 500_000,
-        "advantages": "Supports long document processing for better contextual understanding.",
-        "disadvantages": "Lower token throughput compared to some other models.",
+        "advantages": "Long-context capabilities, well-tested for handling detailed research papers.",
+        "disadvantages": "Older model compared to Llama 3.1/3.3 versions.",
     },
 }
 
@@ -109,12 +100,12 @@ models = {
 selected_models = st.sidebar.multiselect(
     "Choose Models",
     options=list(models.keys()),
-    default=["llama3-70b-8192"],  # Default model selection
+    default=["llama-3.3-70b-versatile"],  # Updated default model selection
 )
 
 # Fallback default if no model is selected
 if not selected_models:
-    selected_models = ["llama3-70b-8192"]
+    selected_models = ["llama-3.3-70b-versatile"]
 
 # Display details for all selected models
 st.sidebar.write("## Selected Model Details")

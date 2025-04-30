@@ -14,9 +14,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import config.settings as settings
 
-# Define constants within this module as they are only used here
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-# Make paths relative to the project root
 TOKEN_FILE = 'credentials/.gmail_token.json'
 CREDENTIALS_FILE = 'credentials/.gmail_credentials.json'
 

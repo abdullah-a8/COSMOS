@@ -130,13 +130,23 @@ with st.sidebar:
     # Add model settings for fallback
     st.header("Model Settings")
     
-    # LLM models available for fallback
+    # LLM models available for fallback - Updated with latest Groq models
     models = {
-        "llama-3.1-8b-instant": "Fast & efficient, best for simple tasks",
-        "llama3-70b-8192": "Powerful & accurate, best overall performance",
-        "mixtral-8x7b-32768": "Excellent for long context, good balance",
-        "gemma2-9b-it": "Fast with good reasoning capabilities",
-        "qwen-2.5-32b": "Strong reasoning, good for complex tasks",
+        # Latest Meta Models
+        "llama-3.1-8b-instant": "Fast & efficient, best for simple email tasks (4x faster than previous gen)",
+        "llama-3.3-70b-versatile": "Powerful versatile model with excellent comprehension (recommended)",
+        "meta-llama/llama-4-maverick-17b-128e-instruct": "Latest Llama 4 model with superior reasoning",
+        
+        # Specialized Models
+        "deepseek-r1-distill-llama-70b": "Superior reasoning for complex emails and analytical tasks",
+        "compound-beta": "Groq's agentic system for sophisticated email handling",
+        
+        # Additional Models
+        "gemma2-9b-it": "Fast with good reasoning, efficient for straightforward emails",
+        "qwen-qwq-32b": "Strong multilingual capabilities for international correspondence",
+        
+        # Previous Generation (Maintained for compatibility)
+        "llama3-70b-8192": "Previous generation Llama model",
     }
     
     # Configuration for OpenAI and fallback
@@ -150,7 +160,7 @@ with st.sidebar:
         fallback_model = st.selectbox(
             "Fallback Model",
             options=list(models.keys()),
-            index=1,  # Default to llama3-70b-8192
+            index=1,  # Default to llama-3.3-70b-versatile
             format_func=lambda x: f"{x} - {models[x]}",
             help="Select which model to use as fallback if OpenAI is unavailable"
         )
@@ -169,7 +179,7 @@ with st.sidebar:
         st.session_state['use_fallback'] = use_fallback
         
     if 'fallback_model' not in st.session_state:
-        st.session_state['fallback_model'] = fallback_model if fallback_model else "llama3-70b-8192"
+        st.session_state['fallback_model'] = fallback_model if fallback_model else "llama-3.3-70b-versatile"
     if fallback_model != st.session_state.get('fallback_model') and fallback_model:
         st.session_state['fallback_model'] = fallback_model
     
