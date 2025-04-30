@@ -103,6 +103,30 @@ with st.sidebar:
                                help="Gmail search query (e.g., is:unread, from:example@gmail.com)")
     max_results = st.slider("Max Emails to Load", min_value=1, max_value=50, value=10)
     
+    # Add signature configuration
+    st.markdown("---")
+    st.header("Signature Settings")
+    default_signature = "\n--\nSent by COSMOS AI Assistant"
+    
+    if 'custom_signature' not in st.session_state:
+        st.session_state['custom_signature'] = default_signature
+        
+    custom_signature = st.text_area(
+        "Email Signature", 
+        value=st.session_state['custom_signature'],
+        help="Customize your email signature. Leave blank to use default signature.",
+        height=100
+    )
+    
+    if custom_signature != st.session_state['custom_signature']:
+        st.session_state['custom_signature'] = custom_signature
+    
+    if st.button("Reset to Default"):
+        st.session_state['custom_signature'] = default_signature
+        st.rerun()
+    
+    st.markdown("---")
+    
     if st.button("Fetch Emails"):
         if service:
             with st.spinner("Fetching emails..."):
@@ -152,7 +176,17 @@ if 'emails' in st.session_state and st.session_state['emails']:
             with col2:
                  if st.button("Summarize Email"):
                     with st.spinner("Generating summary..."):
-                        summary = summarize_email(selected_email['body'])
+                        # Get user's email from Gmail service
+                        try:
+                            user_info = service.users().getProfile(userId='me').execute()
+                            recipient_info = {
+                                'name': user_info.get('emailAddress', '').split('@')[0],  # Use username part of email
+                                'email': user_info.get('emailAddress', '')
+                            }
+                        except:
+                            recipient_info = None
+                            
+                        summary = summarize_email(selected_email['body'], recipient_info)
                     st.session_state['email_summary'] = summary
 
             # Display summary if available
@@ -208,7 +242,8 @@ if 'emails' in st.session_state and st.session_state['emails']:
                             reply_subject,
                             edited_reply,
                             thread_id=selected_email['thread_id'],
-                            original_message_id=selected_email['id']
+                            original_message_id=selected_email['id'],
+                            custom_signature=st.session_state.get('custom_signature')
                         )
                         
                         if send_status:

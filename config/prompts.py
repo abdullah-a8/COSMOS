@@ -69,11 +69,22 @@ Write a complete, ready-to-send email response. Don't use placeholders and make 
 """
 
 GMAIL_SUMMARIZE_PROMPT = """
-Please provide a concise summary of the key points from the following email content. 
+Please provide a concise, personalized summary of the key points from the following email content.
 Focus on the main topic, decisions made, and any action items mentioned.
+
+Recipient Info:
+Name: {recipient_name}
+Email: {recipient_email}
 
 Email Content:
 {email_content}
+
+Instructions:
+1. Use the recipient's name when referring to them in the summary
+2. Identify if the email is directly addressed to the recipient or if they are CC'd/BCC'd
+3. Highlight any specific actions or responses required from the recipient
+4. Note any deadlines or time-sensitive information relevant to the recipient
+5. Replace generic references with personalized ones (e.g., "you" instead of "the recipient")
 
 Summary:
 """

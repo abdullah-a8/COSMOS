@@ -144,18 +144,23 @@ def get_emails(service, max_results=10, query=None):
         st.error(f"An unexpected error occurred fetching emails: {e}")
         return []
 
-def send_email(service, to, subject, body, thread_id=None, original_message_id=None):
+def send_email(service, to, subject, body, thread_id=None, original_message_id=None, custom_signature=None):
     """Sends an email using the authenticated Gmail service, adding threading headers if possible."""
     if not service:
         st.error("Gmail service not available. Cannot send email.")
         return None
     try:
+        # Add signature (custom or default)
+        default_signature = "\n\n--\nSent by COSMOS AI Assistant\nPowered by OpenAI GPT"
+        signature = custom_signature if custom_signature is not None else default_signature
+        body_with_signature = f"{body}{signature}"
+        
         message_body = (
             f"To: {to}\r\n"
             f"Subject: {subject}\r\n"
             f"Content-Type: text/plain; charset=utf-8\r\n"
             # Initial newline before body
-            f"\r\n{body}"
+            f"\r\n{body_with_signature}"
         )
         
         # --- Add Threading Headers (In-Reply-To / References) ---
@@ -302,8 +307,8 @@ def generate_reply(email_body, email_subject, sender_name, tone, style, length, 
         st.error(f"Error generating reply with OpenAI: {str(e)}")
         return ""
 
-def summarize_email(email_body):
-    """Summarizes email content using OpenAI."""
+def summarize_email(email_body, recipient_info=None):
+    """Summarizes email content using OpenAI with recipient personalization."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         st.error("OpenAI API key not found in environment variables")
@@ -311,20 +316,28 @@ def summarize_email(email_body):
 
     try:
         client = openai.OpenAI(api_key=openai_api_key)
+        
+        # Set default recipient info if not provided
+        if not recipient_info:
+            recipient_info = {
+                'name': 'User',
+                'email': 'you@example.com'
+            }
+            
         prompt_content = prompts.GMAIL_SUMMARIZE_PROMPT.format(
-            email_content=email_body[:4000] # Trim for safety
+            email_content=email_body[:4000],  # Trim for safety
+            recipient_name=recipient_info.get('name', 'User'),
+            recipient_email=recipient_info.get('email', 'you@example.com')
         )
-        # Use the Chat Completions endpoint with a compatible chat model
+        
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": prompt_content}],
             max_tokens=250,
             temperature=0.7
         )
-        # Access response content correctly for chat completions
         summary = response.choices[0].message.content.strip()
         return summary
     except Exception as e:
         st.error(f"Error summarizing email with OpenAI: {str(e)}")
-        # Provide a more user-friendly error message potentially
         return f"Error during summarization. Please check API key and connection." 
