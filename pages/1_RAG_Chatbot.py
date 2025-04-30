@@ -223,14 +223,29 @@ st.sidebar.button("Reset Chat & Clear Upload", on_click=reset_app)
 
 # Check if reset is flagged
 if st.session_state.get("reset", False):
-    # Clear all session state variables and cache
-    keys_to_keep = []
+    # Identify keys to preserve (authentication-related)
+    keys_to_keep = ['authentication_status', 'username', 'name', 'authenticator', 'logout']
+    
+    # Save values of keys we want to keep
+    preserved_values = {}
+    for key in keys_to_keep:
+        if key in st.session_state:
+            preserved_values[key] = st.session_state[key]
+    
+    # Clear all session state variables except those in keys_to_keep
     for key in list(st.session_state.keys()):
         if key not in keys_to_keep:
             del st.session_state[key]
+    
+    # Restore preserved values
+    for key, value in preserved_values.items():
+        st.session_state[key] = value
+        
+    # Clear caches but maintain authentication
     st.cache_data.clear()
     st.cache_resource.clear()
     st.session_state["reset"] = False
+    
     # Explicitly flag that we need to reinitialize the vector store
     st.session_state["rag_vector_store_initialized"] = False
     st.session_state["rag_vector_store"] = None
