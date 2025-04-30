@@ -9,6 +9,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import openai
 import config.prompts as prompts
+from langchain_groq import ChatGroq
+from langchain.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+import config.settings as settings
 
 # Define constants within this module as they are only used here
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
@@ -247,97 +251,238 @@ def modify_email_labels(service, message_id, labels_to_add=None, labels_to_remov
 
 # --- OpenAI Interaction Functions ---
 
-def classify_email(email_body, email_subject):
-    """Classifies email content using OpenAI."""
+def classify_email(email_body, email_subject, use_fallback=True, fallback_model=None):
+    """Classifies email content using OpenAI with LangChain fallback."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        st.error("OpenAI API key not found in environment variables")
-        return "Unknown"
     
-    try:
-        client = openai.OpenAI(api_key=openai_api_key)
-        prompt_content = prompts.GMAIL_CLASSIFY_PROMPT.format(
-            email_subject=email_subject,
-            email_body=email_body[:1000] # Trim for safety
+    # Try OpenAI first
+    if openai_api_key:
+        try:
+            client = openai.OpenAI(api_key=openai_api_key)
+            prompt_content = prompts.GMAIL_CLASSIFY_PROMPT.format(
+                email_subject=email_subject,
+                email_body=email_body[:1000] # Trim for safety
+            )
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt_content}],
+                max_tokens=15,
+                temperature=0.3
+            )
+            category = response.choices[0].message.content.strip()
+            return category
+        except Exception as e:
+            print(f"OpenAI error: {str(e)}. Attempting fallback if enabled.")
+            if not use_fallback:
+                st.error(f"Error classifying email with OpenAI: {str(e)}")
+                return "Unknown"
+    
+    # Use LangChain fallback if OpenAI fails or no API key
+    if use_fallback:
+        return classify_with_langchain(
+            email_body, 
+            email_subject, 
+            prompts.GMAIL_CLASSIFY_PROMPT,
+            model_name=fallback_model
         )
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt_content}],
-            max_tokens=15,
-            temperature=0.3
-        )
-        category = response.choices[0].message.content.strip()
-        return category
-    except Exception as e:
-        st.error(f"Error classifying email with OpenAI: {str(e)}")
+    else:
+        st.error("OpenAI API key not found and fallback not enabled")
         return "Unknown"
 
-def generate_reply(email_body, email_subject, sender_name, tone, style, length, user_context="N/A"):
-    """Generates an email reply using OpenAI, incorporating optional user context."""
+def generate_reply(email_body, email_subject, sender_name, tone, style, length, 
+                  user_context="N/A", use_fallback=True, fallback_model=None):
+    """Generates an email reply using OpenAI with LangChain fallback."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        st.error("OpenAI API key not found in environment variables")
-        return ""
     
-    try:
-        client = openai.OpenAI(api_key=openai_api_key)
-        
-        # Ensure user_context has a default value if empty or None
-        if not user_context:
-            user_context = "N/A"
+    # Try OpenAI first
+    if openai_api_key:
+        try:
+            client = openai.OpenAI(api_key=openai_api_key)
             
-        prompt_content = prompts.GMAIL_GENERATE_REPLY_PROMPT.format(
-            sender_name=sender_name,
-            subject=email_subject, # Renamed placeholder in prompt
-            email_body=email_body[:1500], # Trim for safety
-            tone=tone,
-            style=style,
-            length=length,
-            user_context=user_context # Add user context to format
+            # Ensure user_context has a default value if empty or None
+            if not user_context:
+                user_context = "N/A"
+                
+            prompt_content = prompts.GMAIL_GENERATE_REPLY_PROMPT.format(
+                sender_name=sender_name,
+                subject=email_subject,
+                email_body=email_body[:1500],
+                tone=tone,
+                style=style,
+                length=length,
+                user_context=user_context
+            )
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt_content}],
+                max_tokens=1000,
+                temperature=0.7
+            )
+            generated_reply = response.choices[0].message.content.strip()
+            return generated_reply
+        except Exception as e:
+            print(f"OpenAI error: {str(e)}. Attempting fallback if enabled.")
+            if not use_fallback:
+                st.error(f"Error generating reply with OpenAI: {str(e)}")
+                return ""
+    
+    # Use LangChain fallback if OpenAI fails or no API key
+    if use_fallback:
+        return generate_reply_with_langchain(
+            email_body,
+            email_subject,
+            sender_name,
+            tone,
+            style,
+            length,
+            prompts.GMAIL_GENERATE_REPLY_PROMPT,
+            model_name=fallback_model,
+            user_context=user_context
         )
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt_content}],
-            max_tokens=1000,
-            temperature=0.7
-        )
-        generated_reply = response.choices[0].message.content.strip()
-        return generated_reply
-    except Exception as e:
-        st.error(f"Error generating reply with OpenAI: {str(e)}")
+    else:
+        st.error("OpenAI API key not found and fallback not enabled")
         return ""
 
-def summarize_email(email_body, recipient_info=None):
-    """Summarizes email content using OpenAI with recipient personalization."""
+def summarize_email(email_body, recipient_info=None, use_fallback=True, fallback_model=None):
+    """Summarizes email content using OpenAI with LangChain fallback."""
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        st.error("OpenAI API key not found in environment variables")
-        return "Error: API key not found."
-
-    try:
-        client = openai.OpenAI(api_key=openai_api_key)
-        
-        # Set default recipient info if not provided
-        if not recipient_info:
-            recipient_info = {
-                'name': 'User',
-                'email': 'you@example.com'
-            }
+    
+    # Set default recipient info if not provided
+    if not recipient_info:
+        recipient_info = {
+            'name': 'User',
+            'email': 'you@example.com'
+        }
+    
+    # Try OpenAI first
+    if openai_api_key:
+        try:
+            client = openai.OpenAI(api_key=openai_api_key)
             
-        prompt_content = prompts.GMAIL_SUMMARIZE_PROMPT.format(
-            email_content=email_body[:4000],  # Trim for safety
+            prompt_content = prompts.GMAIL_SUMMARIZE_PROMPT.format(
+                email_content=email_body[:4000],
+                recipient_name=recipient_info.get('name', 'User'),
+                recipient_email=recipient_info.get('email', 'you@example.com')
+            )
+            
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt_content}],
+                max_tokens=250,
+                temperature=0.7
+            )
+            summary = response.choices[0].message.content.strip()
+            return summary
+        except Exception as e:
+            print(f"OpenAI error: {str(e)}. Attempting fallback if enabled.")
+            if not use_fallback:
+                st.error(f"Error summarizing email with OpenAI: {str(e)}")
+                return f"Error during summarization. Please check API key and connection."
+    
+    # Use LangChain fallback if OpenAI fails or no API key
+    if use_fallback:
+        # Create a properly formatted prompt with recipient info
+        formatted_prompt = prompts.GMAIL_SUMMARIZE_PROMPT.format(
+            email_content="{email_content}",
             recipient_name=recipient_info.get('name', 'User'),
             recipient_email=recipient_info.get('email', 'you@example.com')
         )
         
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt_content}],
-            max_tokens=250,
-            temperature=0.7
+        return summarize_with_langchain(
+            email_body,
+            formatted_prompt,
+            model_name=fallback_model
         )
-        summary = response.choices[0].message.content.strip()
-        return summary
+    else:
+        st.error("OpenAI API key not found and fallback not enabled")
+        return f"Error during summarization. Please check API key and connection."
+
+# --- LangChain Fallback Functions ---
+
+def get_langchain_model(model_name=None, temperature=None):
+    """Creates a LangChain model with the specified model and temperature."""
+    # Use provided values or fall back to defaults from settings
+    effective_model_name = model_name if model_name is not None else settings.DEFAULT_MODEL_NAME
+    effective_temperature = temperature if temperature is not None else settings.DEFAULT_TEMPERATURE
+    
+    if not settings.GROQ_API_KEY:
+        print("Error: GROQ_API_KEY not found in settings.")
+        return None
+        
+    try:
+        model = ChatGroq(
+            temperature=effective_temperature,
+            groq_api_key=settings.GROQ_API_KEY,
+            model_name=effective_model_name,
+        )
+        return model
     except Exception as e:
-        st.error(f"Error summarizing email with OpenAI: {str(e)}")
-        return f"Error during summarization. Please check API key and connection." 
+        print(f"Error initializing ChatGroq: {e}")
+        return None
+
+def summarize_with_langchain(email_body, prompt_template, model_name=None, temperature=None):
+    """Summarizes email content using LangChain as a fallback."""
+    model = get_langchain_model(model_name, temperature)
+    if not model:
+        return "Error: Could not initialize LangChain fallback model."
+        
+    parser = StrOutputParser()
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    chain = prompt | model | parser
+    
+    try:
+        summary = chain.invoke({"email_content": email_body[:4000]})
+        return summary.strip()
+    except Exception as e:
+        print(f"Error summarizing with LangChain: {e}")
+        return f"Error during LangChain summarization: {str(e)}"
+
+def classify_with_langchain(email_body, email_subject, prompt_template, model_name=None, temperature=None):
+    """Classifies email content using LangChain as a fallback."""
+    model = get_langchain_model(model_name, temperature)
+    if not model:
+        return "Unknown"
+        
+    parser = StrOutputParser()
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    chain = prompt | model | parser
+    
+    try:
+        category = chain.invoke({
+            "email_subject": email_subject,
+            "email_body": email_body[:1000]
+        })
+        return category.strip()
+    except Exception as e:
+        print(f"Error classifying with LangChain: {e}")
+        return "Unknown"
+        
+def generate_reply_with_langchain(email_body, email_subject, sender_name, tone, style, length, 
+                                  prompt_template, model_name=None, temperature=None, user_context="N/A"):
+    """Generates an email reply using LangChain as a fallback."""
+    model = get_langchain_model(model_name, temperature)
+    if not model:
+        return "Error: Could not initialize LangChain fallback model."
+        
+    parser = StrOutputParser()
+    prompt = ChatPromptTemplate.from_template(prompt_template)
+    chain = prompt | model | parser
+    
+    try:
+        # Ensure user_context has a default value if empty or None
+        if not user_context:
+            user_context = "N/A"
+            
+        reply = chain.invoke({
+            "sender_name": sender_name,
+            "subject": email_subject,
+            "email_body": email_body[:1500],
+            "tone": tone,
+            "style": style,
+            "length": length,
+            "user_context": user_context
+        })
+        return reply.strip()
+    except Exception as e:
+        print(f"Error generating reply with LangChain: {e}")
+        return f"Error during LangChain reply generation: {str(e)}" 

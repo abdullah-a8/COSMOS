@@ -127,6 +127,54 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Add model settings for fallback
+    st.header("Model Settings")
+    
+    # LLM models available for fallback
+    models = {
+        "llama-3.1-8b-instant": "Fast & efficient, best for simple tasks",
+        "llama3-70b-8192": "Powerful & accurate, best overall performance",
+        "mixtral-8x7b-32768": "Excellent for long context, good balance",
+        "gemma2-9b-it": "Fast with good reasoning capabilities",
+        "qwen-2.5-32b": "Strong reasoning, good for complex tasks",
+    }
+    
+    # Configuration for OpenAI and fallback
+    use_openai = st.checkbox("Use OpenAI GPT", value=True, 
+                           help="Use OpenAI GPT as the primary model. Requires API key.")
+    
+    use_fallback = st.checkbox("Enable Fallback Models", value=True,
+                             help="If OpenAI fails or is unavailable, use LangChain models as fallback")
+    
+    if use_fallback:
+        fallback_model = st.selectbox(
+            "Fallback Model",
+            options=list(models.keys()),
+            index=1,  # Default to llama3-70b-8192
+            format_func=lambda x: f"{x} - {models[x]}",
+            help="Select which model to use as fallback if OpenAI is unavailable"
+        )
+    else:
+        fallback_model = None
+        
+    # Store settings in session state
+    if 'use_openai' not in st.session_state:
+        st.session_state['use_openai'] = use_openai
+    if use_openai != st.session_state['use_openai']:
+        st.session_state['use_openai'] = use_openai
+        
+    if 'use_fallback' not in st.session_state:
+        st.session_state['use_fallback'] = use_fallback
+    if use_fallback != st.session_state['use_fallback']:
+        st.session_state['use_fallback'] = use_fallback
+        
+    if 'fallback_model' not in st.session_state:
+        st.session_state['fallback_model'] = fallback_model if fallback_model else "llama3-70b-8192"
+    if fallback_model != st.session_state.get('fallback_model') and fallback_model:
+        st.session_state['fallback_model'] = fallback_model
+    
+    st.markdown("---")
+    
     if st.button("Fetch Emails"):
         if service:
             with st.spinner("Fetching emails..."):
@@ -168,7 +216,12 @@ if 'emails' in st.session_state and st.session_state['emails']:
                 selected_email = next((email for email in emails if email['id'] == selected_id_candidate), None)
                 if selected_email:
                     with st.spinner("Generating summary..."):
-                        summary = summarize_email(selected_email['body'], recipient_info)
+                        summary = summarize_email(
+                            selected_email['body'], 
+                            recipient_info,
+                            use_fallback=st.session_state.get('use_fallback', True),
+                            fallback_model=st.session_state.get('fallback_model')
+                        )
                         st.session_state['email_summary'] = summary
 
     # Email details and actions
@@ -195,7 +248,12 @@ if 'emails' in st.session_state and st.session_state['emails']:
             with col1:
                 if st.button("Classify Email"):
                     with st.spinner("Classifying..."):
-                        category = classify_email(selected_email['body'], selected_email['subject'])
+                        category = classify_email(
+                            selected_email['body'], 
+                            selected_email['subject'],
+                            use_fallback=st.session_state.get('use_fallback', True),
+                            fallback_model=st.session_state.get('fallback_model')
+                        )
                     st.info(f"Email classified as: **{category}**")
             
             with col2:
@@ -211,7 +269,12 @@ if 'emails' in st.session_state and st.session_state['emails']:
                         except:
                             recipient_info = None
                             
-                        summary = summarize_email(selected_email['body'], recipient_info)
+                        summary = summarize_email(
+                            selected_email['body'], 
+                            recipient_info,
+                            use_fallback=st.session_state.get('use_fallback', True),
+                            fallback_model=st.session_state.get('fallback_model')
+                        )
                     st.session_state['email_summary'] = summary
 
             st.divider()
@@ -242,7 +305,9 @@ if 'emails' in st.session_state and st.session_state['emails']:
                         tone, 
                         style, 
                         length,
-                        user_context=user_context_input
+                        user_context=user_context_input,
+                        use_fallback=st.session_state.get('use_fallback', True),
+                        fallback_model=st.session_state.get('fallback_model')
                     )
                 st.session_state['generated_reply'] = generated_reply
             
