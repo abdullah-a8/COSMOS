@@ -183,6 +183,14 @@ with st.sidebar:
     if fallback_model != st.session_state.get('fallback_model') and fallback_model:
         st.session_state['fallback_model'] = fallback_model
     
+    # Store which model was last used for each operation
+    if 'last_summary_model' not in st.session_state:
+        st.session_state['last_summary_model'] = None
+    if 'last_classify_model' not in st.session_state:
+        st.session_state['last_classify_model'] = None
+    if 'last_reply_model' not in st.session_state:
+        st.session_state['last_reply_model'] = None
+        
     st.markdown("---")
     
     if st.button("Fetch Emails"):
@@ -192,6 +200,9 @@ with st.sidebar:
             st.session_state['selected_email_id'] = None
             st.session_state['generated_reply'] = ""
             st.session_state['email_summary'] = ""
+            st.session_state['last_summary_model'] = None
+            st.session_state['last_classify_model'] = None
+            st.session_state['last_reply_model'] = None
             st.rerun()
         else:
             st.warning("Please connect to Gmail first.")
@@ -210,6 +221,7 @@ if 'emails' in st.session_state and st.session_state['emails']:
             st.session_state['selected_email_id'] = selected_id_candidate
             st.session_state['generated_reply'] = ""
             st.session_state['email_summary'] = ""
+            st.session_state['last_summary_model'] = None
             
             # Auto-generate summary for the newly selected email
             if service:
@@ -226,13 +238,15 @@ if 'emails' in st.session_state and st.session_state['emails']:
                 selected_email = next((email for email in emails if email['id'] == selected_id_candidate), None)
                 if selected_email:
                     with st.spinner("Generating summary..."):
-                        summary = summarize_email(
+                        summary, model_used = summarize_email(
                             selected_email['body'], 
                             recipient_info,
+                            use_openai=st.session_state.get('use_openai', True),
                             use_fallback=st.session_state.get('use_fallback', True),
                             fallback_model=st.session_state.get('fallback_model')
                         )
                         st.session_state['email_summary'] = summary
+                        st.session_state['last_summary_model'] = model_used
 
     # Email details and actions
     selected_id = st.session_state.get('selected_email_id')
@@ -250,6 +264,8 @@ if 'emails' in st.session_state and st.session_state['emails']:
             with st.expander("View Email Summary", expanded=False):
                 if st.session_state.get('email_summary'):
                     st.markdown(st.session_state['email_summary'])
+                    if st.session_state.get('last_summary_model'):
+                        st.caption(f"⚙️ Summary generated using: {st.session_state['last_summary_model']}")
                 else:
                     st.info("Summary not available. Please try regenerating the summary.")
                 
@@ -258,13 +274,16 @@ if 'emails' in st.session_state and st.session_state['emails']:
             with col1:
                 if st.button("Classify Email"):
                     with st.spinner("Classifying..."):
-                        category = classify_email(
+                        category, model_used = classify_email(
                             selected_email['body'], 
                             selected_email['subject'],
+                            use_openai=st.session_state.get('use_openai', True),
                             use_fallback=st.session_state.get('use_fallback', True),
                             fallback_model=st.session_state.get('fallback_model')
                         )
+                    st.session_state['last_classify_model'] = model_used
                     st.info(f"Email classified as: **{category}**")
+                    st.caption(f"⚙️ Classification using: {model_used}")
             
             with col2:
                  if st.button("Regenerate Summary"):
@@ -279,13 +298,17 @@ if 'emails' in st.session_state and st.session_state['emails']:
                         except:
                             recipient_info = None
                             
-                        summary = summarize_email(
+                        summary, model_used = summarize_email(
                             selected_email['body'], 
                             recipient_info,
+                            use_openai=st.session_state.get('use_openai', True),
                             use_fallback=st.session_state.get('use_fallback', True),
                             fallback_model=st.session_state.get('fallback_model')
                         )
                     st.session_state['email_summary'] = summary
+                    st.session_state['last_summary_model'] = model_used
+                    st.success("Summary regenerated successfully")
+                    st.caption(f"⚙️ Generated using: {model_used}")
 
             st.divider()
             st.subheader("Generate Reply")
@@ -308,7 +331,7 @@ if 'emails' in st.session_state and st.session_state['emails']:
             
             if st.button("Generate Draft Reply"):
                 with st.spinner("Generating draft reply..."):
-                    generated_reply = generate_reply(
+                    generated_reply, model_used = generate_reply(
                         selected_email['body'],
                         selected_email['subject'],
                         selected_email['from'],
@@ -316,14 +339,22 @@ if 'emails' in st.session_state and st.session_state['emails']:
                         style, 
                         length,
                         user_context=user_context_input,
+                        use_openai=st.session_state.get('use_openai', True),
                         use_fallback=st.session_state.get('use_fallback', True),
                         fallback_model=st.session_state.get('fallback_model')
                     )
                 st.session_state['generated_reply'] = generated_reply
+                st.session_state['last_reply_model'] = model_used
+                st.success("Draft reply generated")
+                st.caption(f"⚙️ Generated using: {model_used}")
             
             # Edit and send reply
             if 'generated_reply' in st.session_state and st.session_state['generated_reply']:
                 edited_reply = st.text_area("Edit Reply:", value=st.session_state['generated_reply'], height=250)
+                
+                # Display which model was used for generation
+                if st.session_state.get('last_reply_model'):
+                    st.caption(f"⚙️ Draft generated using: {st.session_state['last_reply_model']}")
                 
                 if st.button("Send Reply"):
                     if service:
@@ -353,12 +384,15 @@ if 'emails' in st.session_state and st.session_state['emails']:
                             st.session_state['email_summary'] = ""
                             st.session_state['selected_email_id'] = None
                             st.session_state['emails'] = None
+                            st.session_state['last_summary_model'] = None
+                            st.session_state['last_classify_model'] = None
+                            st.session_state['last_reply_model'] = None
                             st.rerun()
                         else:
                             st.error("Failed to send the reply.")
                     else:
                         st.error("Authentication error. Cannot send email.")
-            
+
 # No emails message
 elif 'emails' in st.session_state and not st.session_state['emails']:
     st.info("No emails found matching your query or no unread emails.")
