@@ -46,6 +46,15 @@ def process_content(content, chunk_size, chunk_overlap, source_id):
             "citation_text": f"YouTube video ({video_id})",
             "display_name": "YouTube"
         })
+    elif source_id.startswith("ocr_"):
+        # Handle OCR-processed content
+        short_id = source_id[4:12] + "..." if len(source_id) > 12 else source_id[4:]
+        source_metadata.update({
+            "source_type": "ocr",
+            "title": f"OCR-Processed Content (ID: {short_id})",
+            "citation_text": f"OCR-processed document ({short_id})",
+            "display_name": "OCR document"
+        })
     elif domain_name:  # Handle URLs where a domain was successfully extracted
         source_metadata.update({
             "source_type": "url",

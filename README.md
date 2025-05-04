@@ -25,8 +25,9 @@ The system combines Retrieval-Augmented Generation (RAG) for knowledge-based cha
 ### 🤖 RAG Chatbot (`1_RAG_Chatbot.py`)
 - **Multi-Model Flexibility**: Choose from a wide range of Large Language Models (LLMs) via Groq (Llama, Mistral, Mixtral, Gemma, etc.) to tailor performance and cost.
 - **Unified Knowledge Base**: Ingests and processes content from PDFs, web URLs, and YouTube transcripts (processed by the YouTube agent), making all information searchable in one place.
+- **OCR Processing**: Extracts text from images and image-containing PDFs using Mistral AI's OCR capabilities, adding this content to the knowledge base.
 - **Contextual Chat**: Uses RAG to retrieve relevant text chunks from the knowledge base before generating answers, ensuring responses are grounded in the provided content.
-- **Source Tracking & Filtering**: Identifies the source of information (PDF, URL, YouTube) and allows users to filter which sources the chatbot should use during retrieval.
+- **Source Tracking & Filtering**: Identifies the source of information (PDF, URL, YouTube, OCR) and allows users to filter which sources the chatbot should use during retrieval.
 - **Fine-tuning Parameters**: Allows users to adjust LLM temperature, chunk size, and chunk overlap to optimize retrieval and response generation for different needs.
 
 ### 🎥 YouTube Processor (`2_YouTube_Processor.py`)
@@ -45,17 +46,52 @@ The system combines Retrieval-Augmented Generation (RAG) for knowledge-based cha
 - **Direct Sending**: Sends the drafted (and potentially edited) replies directly from the interface using the Gmail API, automatically handling threading.
 - **Label Management**: Marks replied-to emails as read automatically by removing the `UNREAD` label.
 
+# New Feature: Mistral OCR Integration
+
+COSMOS now integrates Mistral AI's OCR capabilities, allowing you to:
+
+- Process images and extract text using state-of-the-art OCR technology
+- Process PDFs with both text and images, combining regular PDF extraction with OCR for images
+- Seamlessly add OCR-processed content to your knowledge base for RAG-powered chat
+
+## Setup
+
+To use the Mistral OCR feature, you need to:
+
+1. Add your Mistral API key to your environment variables:
+   ```
+   MISTRAL_API_KEY=your_mistral_api_key
+   ```
+
+2. Select "Mistral OCR" from the input methods in the RAG Chatbot page
+3. Upload an image or PDF with images to process
+
+## Supported File Types
+
+- Images: JPG, JPEG, PNG, BMP, TIFF, TIF
+- PDFs with text and images
+
+## Implementation Details
+
+The Mistral OCR integration uses the Mistral AI REST API directly to ensure compatibility and reliability:
+
+- Images are encoded to base64 and sent to the Mistral OCR API endpoint
+- For PDFs, the text is extracted directly using PyMuPDF, and each image within the PDF is processed separately
+- Combined results (extracted text + OCR results from images) are then processed through the standard RAG pipeline
+- OCR-processed content is tagged with a special source type ("ocr") in the vector database, allowing for filtering in search
+
 ## Technical Architecture
 
 COSMOS utilizes a modular Python architecture centered around Streamlit for the UI and LangChain for orchestrating AI components.
 
 ### Core Components (`core/`)
 
-- **`data_extraction.py`**: Contains functions to extract raw text content from different sources (PDFs via `PyMuPDF`, URLs via `newspaper4k`, YouTube transcripts via `youtube-transcript-api`).
+- **`data_extraction.py`**: Contains functions to extract raw text content from different sources (PDFs via `PyMuPDF`, URLs via `newspaper4k`, YouTube transcripts via `youtube-transcript-api`, images via Mistral OCR).
 - **`processing.py`**: Takes raw text and a source identifier, performs text splitting (`RecursiveCharacterTextSplitter` from LangChain), enriches chunks with metadata (source type, URL, domain, timestamp, chunk sequence), and prepares them for embedding.
 - **`vector_store.py`**: Handles interactions with the Pinecone vector database. It initializes the connection using environment variables and provides functions to add processed document chunks (with embeddings generated via `OpenAIEmbeddings` using the `text-embedding-3-large` model) to the specified Pinecone index.
 - **`chain.py`**: Sets up the core LangChain sequence (LCEL) for the RAG functionality. It defines the prompt template (`ChatPromptTemplate`), initializes the selected ChatGroq LLM model with specific temperature settings, and includes the output parser (`StrOutputParser`).
 - **`agents/gmail_logic.py`**: Encapsulates all logic related to the Gmail agent, including OAuth authentication (`google-auth-oauthlib`, `google-api-python-client`), fetching/sending emails, and interacting *directly* with the OpenAI API (`openai` library) for classification, summarization, and reply generation using predefined prompts.
+- **`ocr/mistral_ocr.py`**: Handles OCR processing for images and PDFs with images using the Mistral AI API, with implementations for both SDK-based and REST API approaches.
 
 ### C++ Extensions (`cpp_extensions/`)
 
@@ -136,6 +172,7 @@ These extensions are built using pybind11 for seamless Python integration and im
     GROQ_API_KEY="your_groq_api_key"
     PINECONE_API_KEY="your_pinecone_api_key"
     PINECONE_INDEX_NAME="your_pinecone_index_name"
+    MISTRAL_API_KEY="your_mistral_api_key"
     ```
     **Important**: Ensure your Pinecone index is configured with **3072 dimensions** to match the `text-embedding-3-large` model used for OpenAI embeddings.
 
@@ -176,10 +213,13 @@ These extensions are built using pybind11 for seamless Python integration and im
 ### Working with the RAG Chatbot
 
 1.  Navigate to the **RAG Chatbot** page via the sidebar.
-2.  **Add Content**: Use the sidebar options to upload PDF files or enter web URLs. The system will process them and add them to the Pinecone knowledge base.
+2.  **Add Content**: 
+    - Use the sidebar options to upload PDF files or enter web URLs
+    - Upload images or PDFs with images to leverage OCR processing
+    - Watch as the system processes your content and adds it to the Pinecone knowledge base
 3.  **Configure Settings**: Adjust the LLM model, temperature, chunk size, and overlap in the sidebar to control how the chatbot retrieves information and generates responses.
 4.  **Chat**: Type your questions about the ingested content into the chat input at the bottom.
-5.  **Filter Sources**: While source metadata (PDF, URL, YouTube) is stored, active filtering during chat retrieval is not yet implemented in the UI. All ingested content is currently searched.
+5.  **Filter Sources**: Use the sidebar options to filter which types of sources (PDF, URL, YouTube, OCR) the chatbot should search when answering your questions.
 
 ### Processing YouTube Videos
 
@@ -237,6 +277,9 @@ COSMOS/
 │   ├── data_extraction.py   # Functions for extracting text from sources
 │   ├── processing.py        # Text chunking and metadata enrichment logic
 │   ├── vector_store.py      # Pinecone connection and vector operations
+│   ├── ocr/
+│   │   ├── __init__.py
+│   │   └── mistral_ocr.py   # OCR implementation using Mistral AI
 │   └── agents/
 │       ├── __init__.py
 │       └── gmail_logic.py   # Core logic for Gmail agent (API, OpenAI tasks)
@@ -282,5 +325,6 @@ This project is licensed under the MIT License. See the `LICENSE` file for detai
 -   C++ extensions built with [pybind11](https://github.com/pybind/pybind11) for Python-C++ interoperability.
 -   PDF processing in C++ powered by [Poppler](https://poppler.freedesktop.org/).
 -   Cryptographic operations via [OpenSSL](https://www.openssl.org/).
+-   OCR capabilities powered by [Mistral AI](https://mistral.ai/).
 
 ---

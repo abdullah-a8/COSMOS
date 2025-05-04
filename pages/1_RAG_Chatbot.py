@@ -1,5 +1,5 @@
 import streamlit as st
-from core.data_extraction import extract_text_from_pdf, extract_text_from_url
+from core.data_extraction import extract_text_from_pdf, extract_text_from_url, extract_content_with_ocr
 from core.processing import process_content
 from core.vector_store import get_pinecone_vector_store, add_chunks_to_vector_store
 from core.chain import get_chain, ask_question, get_fast_chain
@@ -10,6 +10,7 @@ import time
 import datetime
 import concurrent.futures
 import re
+import os
 
 # --- Authentication Check --- 
 # Ensure the user is logged in, otherwise stop execution
@@ -35,7 +36,7 @@ models = {
         "advantages": "Latest versatile model with 128K context window and superior reasoning capabilities.",
         "disadvantages": "Limited daily requests compared to smaller models.",
     },
-    "meta-llama/llama-4-maverick-17b-128e-instruct": {
+    "llama-4-maverick-17b-128e-instruct": {
         "requests_per_minute": 30,
         "requests_per_day": 7_000,
         "tokens_per_minute": 15_000,
@@ -253,7 +254,7 @@ if st.session_state.get("reset", False):
 
 # Content Upload Section
 st.sidebar.title("Add Content to Knowledge Base")
-input_method = st.sidebar.radio("Input Method", ["PDF File", "URL"])
+input_method = st.sidebar.radio("Input Method", ["PDF File", "URL", "Image(s)"])
 
 uploaded_file = None
 url = None
@@ -268,6 +269,8 @@ def cached_extract_text(input_method, uploaded_file_key=None, url=None):
         _content, _source_id = extract_text_from_pdf(uploaded_file_key)
     elif input_method == "URL" and url:
         _content, _source_id = extract_text_from_url(url)
+    elif input_method == "Image(s)" and uploaded_file_key:
+        _content, _source_id = extract_content_with_ocr(uploaded_file_key)
 
     if _source_id:
         st.session_state["rag_current_source_id"] = _source_id
@@ -309,13 +312,52 @@ def preprocess_query(query):
 
 # Process uploaded inputs
 if input_method == "PDF File":
-    uploaded_file = st.sidebar.file_uploader("Upload a PDF File", key="pdf_uploader")
+    uploaded_file = st.sidebar.file_uploader("Upload a PDF File", key="pdf_uploader", type=["pdf"])
     if uploaded_file:
         content, source_id = cached_extract_text(input_method, uploaded_file_key=uploaded_file, url=None)
 elif input_method == "URL":
     url = st.sidebar.text_input("Enter a News URL", key="url_input")
     if url:
         content, source_id = cached_extract_text(input_method, uploaded_file_key=None, url=url)
+elif input_method == "Image(s)":
+    st.sidebar.markdown("""
+    ### Mistral OCR Processing
+    Upload images or PDFs with images to extract text using Mistral's OCR capabilities.
+    """)
+    
+    # Check if Mistral API key is available
+    if not os.getenv("MISTRAL_API_KEY"):
+        st.sidebar.error("""
+        **Mistral API Key Missing!**
+        
+        Please add your Mistral API key to your environment variables:
+        ```
+        MISTRAL_API_KEY=your_mistral_api_key_here
+        ```
+        """)
+    else:
+        uploaded_file = st.sidebar.file_uploader(
+            "Upload Image or PDF with Images", 
+            key="ocr_uploader", 
+            type=["pdf", "jpg", "jpeg", "png", "bmp", "tiff", "tif"]
+        )
+        
+        if uploaded_file:
+            with st.sidebar.status("Processing with Mistral OCR...") as status:
+                try:
+                    content, source_id = cached_extract_text(input_method, uploaded_file_key=uploaded_file, url=None)
+                    
+                    if content and content.startswith("Error"):
+                        status.update(label="OCR Processing Failed", state="error")
+                        st.sidebar.error(content)
+                    elif not source_id:
+                        status.update(label="OCR Processing Failed", state="error")
+                        st.sidebar.error("Failed to generate a valid source ID.")
+                    else:
+                        status.update(label="OCR Processing Complete", state="complete")
+                except Exception as e:
+                    status.update(label="OCR Processing Failed", state="error")
+                    st.sidebar.error(f"Error processing with OCR: {str(e)}")
 
 # Determine if processing should occur
 last_processed_id = st.session_state.get("rag_last_processed_source_id")
@@ -430,13 +472,15 @@ st.header("Chat with the Knowledge Base 🤖")
 # Add source type filtering
 with st.expander("Advanced Settings", expanded=False):
     st.subheader("Knowledge Source Filters")
-    cols = st.columns(3)
+    cols = st.columns(4)  # Expanded from 3 to 4 columns
     with cols[0]:
         include_pdf = st.checkbox("PDF Documents", value=True)
     with cols[1]:
         include_url = st.checkbox("Web Articles", value=True)
     with cols[2]:
         include_youtube = st.checkbox("YouTube Transcripts", value=True)
+    with cols[3]:
+        include_ocr = st.checkbox("OCR Processed Content", value=True)
     
     # Build filter based on selections
     source_filters = []
@@ -446,10 +490,12 @@ with st.expander("Advanced Settings", expanded=False):
         source_filters.append("url")
     if include_youtube:
         source_filters.append("youtube")
+    if include_ocr:
+        source_filters.append("ocr")
     
     if not source_filters:
         st.warning("Please select at least one knowledge source type", icon="⚠️")
-        source_filters = ["pdf", "url", "youtube"]  # Default to all if none selected
+        source_filters = ["pdf", "url", "youtube", "ocr"]  # Default to all if none selected
 
 # Display conversation history
 for message in st.session_state["rag_messages"]:

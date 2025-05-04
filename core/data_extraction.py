@@ -3,6 +3,7 @@ from newspaper import Article
 from time import sleep
 import hashlib
 from youtube_transcript_api import YouTubeTranscriptApi
+from core.mistral_ocr import process_file_with_ocr
 
 # Try to import the C++ implementations first, fall back to Python if not available
 try:
@@ -71,6 +72,23 @@ def extract_text_from_url(url, retries=3):
                 sleep(2)
                 continue
             return f"Error processing URL after {retries} attempts: {e}", None
+
+def extract_content_with_ocr(file):
+    """
+    Extract content from a file using Mistral OCR.
+    This handles both image-only files and PDFs with images.
+    
+    Args:
+        file: Uploaded file object
+        
+    Returns:
+        Tuple of (extracted_text, file_hash)
+    """
+    try:
+        # Use our dedicated OCR processor
+        return process_file_with_ocr(file)
+    except Exception as e:
+        return f"Error processing file with OCR: {str(e)}", None
 
 def extract_transcript_details(youtube_video_url):
     try:
