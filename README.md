@@ -91,7 +91,7 @@ COSMOS utilizes a modular Python architecture centered around Streamlit for the 
 - **`vector_store.py`**: Handles interactions with the Pinecone vector database. It initializes the connection using environment variables and provides functions to add processed document chunks (with embeddings generated via `OpenAIEmbeddings` using the `text-embedding-3-large` model) to the specified Pinecone index.
 - **`chain.py`**: Sets up the core LangChain sequence (LCEL) for the RAG functionality. It defines the prompt template (`ChatPromptTemplate`), initializes the selected ChatGroq LLM model with specific temperature settings, and includes the output parser (`StrOutputParser`).
 - **`agents/gmail_logic.py`**: Encapsulates all logic related to the Gmail agent, including OAuth authentication (`google-auth-oauthlib`, `google-api-python-client`), fetching/sending emails, and interacting *directly* with the OpenAI API (`openai` library) for classification, summarization, and reply generation using predefined prompts.
-- **`ocr/mistral_ocr.py`**: Handles OCR processing for images and PDFs with images using the Mistral AI API, with implementations for both SDK-based and REST API approaches.
+- **`mistral_ocr.py`**: Handles OCR processing for images and PDFs with images using the Mistral AI API, with implementations for both SDK-based and REST API approaches.
 
 ### C++ Extensions (`cpp_extensions/`)
 
@@ -266,6 +266,8 @@ The modular structure (`core/agents/`) is designed for extension. To add a new a
 
 ```
 COSMOS/
+├── app.py                    # Main application script (if applicable, e.g., Flask/FastAPI)
+├── config.yaml               # Main configuration file
 ├── Home.py                   # Main Streamlit app landing page
 ├── pages/
 │   ├── 1_RAG_Chatbot.py     # UI for RAG chat functionality
@@ -275,14 +277,15 @@ COSMOS/
 │   ├── __init__.py
 │   ├── chain.py             # LangChain setup for LLM interaction (RAG)
 │   ├── data_extraction.py   # Functions for extracting text from sources
+│   ├── mistral_ocr.py       # OCR implementation using Mistral AI
 │   ├── processing.py        # Text chunking and metadata enrichment logic
 │   ├── vector_store.py      # Pinecone connection and vector operations
-│   ├── ocr/
+│   ├── agents/
 │   │   ├── __init__.py
-│   │   └── mistral_ocr.py   # OCR implementation using Mistral AI
-│   └── agents/
+│   │   └── gmail_logic.py   # Core logic for Gmail agent (API, OpenAI tasks)
+│   └── cpp_modules/         # Compiled C++ extensions (loaded dynamically)
 │       ├── __init__.py
-│       └── gmail_logic.py   # Core logic for Gmail agent (API, OpenAI tasks)
+│       └── *.so             # Platform-specific shared object files
 ├── cpp_extensions/
 │   ├── text_chunking/       # C++ text chunking source and CMake
 │   ├── pdf_extraction/      # C++ PDF extraction source and CMake
